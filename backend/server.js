@@ -45,3 +45,14 @@ app.get('/api/new-game', (req, res) => {
     res.json(response);
   });
 });
+
+app.get('/api/pokemon/search', (req, res) => {
+  const query = req.query.q;
+  // We search for names starting with or containing the search term
+  const sql = "SELECT pokemon_id, dex_number, name FROM POKEMON WHERE name LIKE ? LIMIT 10";
+  
+  db.all(sql, [`%${query}%`], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    res.json(rows);
+  });
+});
