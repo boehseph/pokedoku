@@ -1,0 +1,31 @@
+.grid-wrapper {
+  display: grid;
+  grid-template-columns: 100px 150px 150px 150px; /* 1 header + 3 cells */
+  gap: 10px;
+  justify-content: center;
+  margin-top: 50px;
+}
+
+.header-cell {
+  background: #333;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  height: 100px;
+  border-radius: 8px;
+}
+
+.play-cell {
+  width: 150px;
+  height: 150px;
+  background: #f0f0f0;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.play-cell:hover {
+  background: #e0e0e0;
+}

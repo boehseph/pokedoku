@@ -17,7 +17,7 @@ const db = new sqlite3.Database('./pokedoku.db', (err) => {
 
 // TEST ROUTE: Get all Pokemon names
 app.get('/api/pokemon', (req, res) => {
-  db.all('SELECT name FROM POKEMON LIMIT 20', [], (err, rows) => {
+  db.all('SELECT name FROM POKEMON LIMIT 5', [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -25,4 +25,23 @@ app.get('/api/pokemon', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+// GET /api/new-game
+app.get('/api/new-game', (req, res) => {
+  // This query picks 6 random types/regions/gens to be constraints
+  const query = `
+    SELECT 'TYPE' as type, name, type_id as id FROM TYPE ORDER BY RANDOM() LIMIT 6;
+  `;
+
+  db.all(query, [], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    
+    // Split 6 random constraints into 3 rows and 3 columns
+    const response = {
+      rows: rows.slice(0, 3),
+      cols: rows.slice(3, 6)
+    };
+    res.json(response);
+  });
 });
