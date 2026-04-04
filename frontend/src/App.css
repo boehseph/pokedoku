@@ -1,9 +1,22 @@
 .grid-wrapper {
   display: grid;
-  grid-template-columns: 100px 150px 150px 150px; /* 1 header + 3 cells */
+  /* 1 header column + 3 play columns */
+  grid-template-columns: 100px 150px 150px 150px;
+  /* 1 header row + 3 play rows - THIS LOCKS THE ALIGNMENT */
+  grid-template-rows: 100px 150px 150px 150px; 
   gap: 10px;
   justify-content: center;
   margin-top: 50px;
+  /* Prevents the grid from squishing on small screens */
+  width: fit-content; 
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Ensure the corner cell exists even if empty, so it takes up its slot */
+.corner-cell {
+  width: 100px;
+  height: 100px;
 }
 
 .header-cell {
@@ -13,8 +26,11 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  height: 100px;
+  /* Remove the height: 100px; from here—the grid handles it now! */
   border-radius: 8px;
+  text-align: center;
+  padding: 5px;
+  font-size: 0.9rem;
 }
 
 .play-cell {
