@@ -11,27 +11,30 @@ interface Pokemon {
   name: string;
 }
 
-const GamePage = () => {
-  const [grid, setGrid] = useState<any>(null);
-  const [guesses, setGuesses] = useState<(Pokemon | null)[][]>([
-    [null, null, null], [null, null, null], [null, null, null]
-  ]);
+interface GamePageProps {
+  grid: any;
+  setGrid: (g: any) => void;
+  guesses: any[][];
+  setGuesses: (g: any[][]) => void;
+  lives: number;
+  setLives: React.Dispatch<React.SetStateAction<number>>;
+}
+
+const GamePage: React.FC<GamePageProps> = ({ 
+  grid, setGrid, guesses, setGuesses, lives, setLives 
+}) => {
+  // Keep local "UI-only" state here (things that reset every time we visit the page)
   const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
   const [successCell, setSuccessCell] = useState<{row: number, col: number} | null>(null);
   const [errorCell, setErrorCell] = useState<{row: number, col: number} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<Pokemon[]>([]);
-  const [lives, setLives] = useState(10);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [modalMessage, setModalMessage] = useState<string | null>(null);
 
   const getPokemonSprite = (dexNumber: number) => 
     `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/emerald/${dexNumber}.png`;
 
-  useEffect(() => {
-    axios.get('http://localhost:5000/api/new-game')
-      .then(res => setGrid(res.data))
-      .catch(err => console.error(err));
-  }, []);
+  // REMOVED: The useEffect that calls /api/new-game is now in App.tsx
 
   const handleCellClick = (row: number, col: number) => {
     if (lives <= 0) {
@@ -55,9 +58,11 @@ const GamePage = () => {
     }
   };
 
-  const handleSelectPokemon = async (pokemon: Pokemon) => {
+  const handleSelectPokemon = async (pokemon: any) => {
     if (!activeCell || !grid || lives <= 0) return;
+    
     setLives(prev => prev - 1);
+    
     try {
       const res = await axios.post('http://localhost:5000/api/check-guess', {
         pokemon_id: pokemon.pokemon_id,
@@ -68,7 +73,7 @@ const GamePage = () => {
       if (res.data.correct) {
         const newGuesses = [...guesses];
         newGuesses[activeCell.row][activeCell.col] = pokemon;
-        setGuesses(newGuesses);
+        setGuesses(newGuesses); // Updates App.tsx state
         setSuccessCell({ row: activeCell.row, col: activeCell.col });
         setTimeout(() => setSuccessCell(null), 500);
       } else {
@@ -92,7 +97,7 @@ const GamePage = () => {
   };
 
   if (!grid) return <div className="loading">Loading PokéDoku...</div>;
-
+  
   return (
     <div className="game-container">
       <h1>PokéDoku</h1>

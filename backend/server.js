@@ -55,23 +55,6 @@ async function doesPokemonExist(c1, c2) {
   });
 }
 
-// Helper to check if a cell is possible
-// This works for Types, but can be expanded for Regions/Gens later
-async function isCellValid(rowId, colId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT COUNT(*) as count 
-      FROM POKEMON_TYPE pt1
-      JOIN POKEMON_TYPE pt2 ON pt1.pokemon_id = pt2.pokemon_id
-      WHERE pt1.type_id = ? AND pt2.type_id = ?
-    `;
-    db.get(sql, [rowId, colId], (err, row) => {
-      if (err) reject(err);
-      resolve(row.count > 0);
-    });
-  });
-}
-
 app.get('/api/new-game', async (req, res) => {
   try {
     // 1. Fetch a pool of possible constraints from all categories
@@ -198,33 +181,51 @@ app.post('/api/get-solutions', async (req, res) => {
 
 // --- AUTH ROUTES ---
 
-// Login: Check credentials
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const sql = `SELECT * FROM USERS WHERE username = ? AND password = ?`;
+// --- SIGNUP ROUTE ---
+app.post('/api/signup', (req, res) => {
+    const { username, password } = req.body;
 
-  db.get(sql, [username, password], (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (user) {
-      res.json({ success: true, user: { id: user.user_id, name: user.username } });
-    } else {
-      res.status(401).json({ success: false, message: "Invalid credentials" });
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Missing credentials" });
     }
-  });
+
+    const query = `INSERT INTO USER (username, password) VALUES (?, ?)`;
+    
+    db.run(query, [username, password], function(err) {
+        if (err) {
+            // Check if error is because username already exists
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ success: false, message: "Username already taken." });
+            }
+            console.error("Signup Error:", err.message);
+            return res.status(500).json({ success: false, message: "Database error during signup." });
+        }
+        // Success! Return the new user ID
+        res.json({ success: true, userId: this.lastID });
+    });
 });
 
-// Signup: Add new user
-app.post('/api/signup', (req, res) => {
-  const { username, password } = req.body;
+// --- LOGIN ROUTE ---
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
 
-  // First check if username exists
-  db.get(`SELECT * FROM USERS WHERE username = ?`, [username], (err, row) => {
-    if (row) return res.status(400).json({ message: "Username already taken" });
+    const query = `SELECT * FROM USER WHERE username = ? AND password = ?`;
 
-    const insertSql = `INSERT INTO USERS (username, password) VALUES (?, ?)`;
-    db.run(insertSql, [username, password], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true, userId: this.lastID });
+    db.get(query, [username, password], (err, row) => {
+        if (err) {
+            console.error("Login Error:", err.message);
+            return res.status(500).json({ success: false, message: "Database error during login." });
+        }
+
+        if (row) {
+            // Found them!
+            res.json({ 
+                success: true, 
+                user: { id: row.user_id, username: row.username } 
+            });
+        } else {
+            // Wrong username or password
+            res.status(401).json({ success: false, message: "Invalid username or password." });
+        }
     });
-  });
 });
