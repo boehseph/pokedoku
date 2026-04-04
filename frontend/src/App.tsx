@@ -24,8 +24,13 @@ function App() {
 
   // --- NEW STATE FOR SEARCH ---
   const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
+  const [successCell, setSuccessCell] = useState<{row: number, col: number} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Pokemon[]>([]);
+
+  const [lives, setLives] = useState(10);
+  const [errorCell, setErrorCell] = useState<{row: number, col: number} | null>(null);
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
 
   const getPokemonSprite = (dexNumber: number) => {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/emerald/${dexNumber}.png`;
@@ -39,6 +44,11 @@ function App() {
 
   // --- 1. HANDLE CELL CLICK ---
   const handleCellClick = (row: number, col: number) => {
+    if (lives <= 0) {
+      setModalMessage("Game Over! You ran out of guesses.");
+      return;
+    }
+    
     if (guesses[row][col]) return; // Don't open if already guessed correctly
     setActiveCell({ row, col });
     setSearchTerm('');
@@ -64,28 +74,53 @@ function App() {
 
   // --- 3. HANDLE SELECTING A POKEMON ---
   const handleSelectPokemon = async (pokemon: Pokemon) => {
-    if (!activeCell || !grid) return;
+    if (!activeCell || !grid || lives <= 0) return;
 
-    const rowConstraint = grid.rows[activeCell.row];
-    const colConstraint = grid.cols[activeCell.col];
+    setLives(prev => prev - 1);
 
     try {
       const res = await axios.post('http://localhost:5000/api/check-guess', {
         pokemon_id: pokemon.pokemon_id,
-        rowConstraint,
-        colConstraint
+        rowConstraint: grid.rows[activeCell.row],
+        colConstraint: grid.cols[activeCell.col]
       });
 
       if (res.data.correct) {
         const newGuesses = [...guesses];
         newGuesses[activeCell.row][activeCell.col] = pokemon;
         setGuesses(newGuesses);
-        setActiveCell(null);
+        
+        // Green Flash
+        setSuccessCell({ row: activeCell.row, col: activeCell.col });
+        setTimeout(() => setSuccessCell(null), 500);
       } else {
-        alert("Wrong! Try again.");
+        // Red Flash
+        setErrorCell({ row: activeCell.row, col: activeCell.col });
+        setTimeout(() => setErrorCell(null), 500);
+        setModalMessage(`${pokemon.name} is incorrect!`);
       }
-    } catch (err) {
-      console.error(err);
+      setActiveCell(null);
+    } catch (err) { console.error(err); }
+  };
+
+const revealRemaining = async () => {
+    if (!grid) return;
+    try {
+      const res = await axios.post('http://localhost:5000/api/get-solutions', {
+        rows: grid.rows,
+        cols: grid.cols
+      });
+      
+      // Create a copy of the current guesses
+      const finalGrid = guesses.map((row, i) => 
+        row.map((cell, j) => cell || res.data[i][j])
+      );
+      
+      setGuesses(finalGrid);
+      setModalMessage(null); 
+    } catch (err) { 
+      console.error("Frontend Reveal Error:", err);
+      alert("Could not fetch solutions. Check backend terminal!");
     }
   };
 
@@ -95,27 +130,41 @@ function App() {
     <div className="game-container">
       <h1>PokéDoku</h1>
 
+      {/* 1. THE GAME GRID */}
       <div className="grid-wrapper">
+        {/* Top-Left Empty Corner */}
         <div className="corner-cell"></div>
-        {grid.cols.map(col => (
-          <div key={col.id} className="header-cell col-header">{col.name}</div>
+
+        {/* Column Headers (Top Row) */}
+        {grid.cols.map((col) => (
+          <div key={col.id} className="header-cell">
+            {col.name}
+          </div>
         ))}
 
+        {/* Rows (Each row starts with a Header, then 3 Play Cells) */}
         {grid.rows.map((row, rowIndex) => (
           <React.Fragment key={row.id}>
-            <div className="header-cell row-header">{row.name}</div>
+            {/* Row Header (Left Side) */}
+            <div className="header-cell">{row.name}</div>
+
+            {/* The 3 Playable Cells for this row */}
             {[0, 1, 2].map((colIndex) => {
               const guessedPokemon = guesses[rowIndex][colIndex];
+              const isError = errorCell?.row === rowIndex && errorCell?.col === colIndex;
+
               return (
                 <div 
-                  key={colIndex} 
-                  className="play-cell"
+                  className={`play-cell 
+                    ${errorCell?.row === rowIndex && errorCell?.col === colIndex ? 'flash-red' : ''} 
+                    ${successCell?.row === rowIndex && successCell?.col === colIndex ? 'flash-green' : ''}
+                  `}
                   onClick={() => handleCellClick(rowIndex, colIndex)}
                 >
                   {guessedPokemon ? (
                     <div className="sprite-container">
-                      <img 
-                        src={getPokemonSprite(guessedPokemon.dex_number)} 
+                      <img
+                        src={getPokemonSprite(guessedPokemon.dex_number)}
                         alt={guessedPokemon.name}
                         className="pokemon-sprite"
                       />
@@ -131,22 +180,49 @@ function App() {
         ))}
       </div>
 
-      {/* --- SEARCH OVERLAY --- */}
+      {/* 2. STATS & COUNTER */}
+      <div className="stats-container">
+        <div className="lives-counter">Guesses: {lives}/10</div>
+      </div>
+
+      {/* 3. ERROR / GAME OVER MODAL */}
+      {modalMessage && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>{lives <= 0 ? "Game Over" : "Incorrect"}</h3>
+            <p>{modalMessage}</p>
+            <button onClick={lives <= 0 ? revealRemaining : () => setModalMessage(null)}>
+              {lives <= 0 ? "View Results" : "Got it"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. SEARCH OVERLAY */}
       {activeCell && (
         <div className="search-overlay">
           <div className="search-modal">
-            <button className="close-btn" onClick={() => setActiveCell(null)}>X</button>
+            <button className="close-btn" onClick={() => setActiveCell(null)}>
+              X
+            </button>
             <h3>Guess a Pokémon</h3>
-            <input 
-              type="text" 
-              placeholder="Type name..." 
-              value={searchTerm} 
+            <p className="hint">
+              Target: {grid.rows[activeCell.row].name} + {grid.cols[activeCell.col].name}
+            </p>
+            <input
+              type="text"
+              placeholder="Type name..."
+              value={searchTerm}
               onChange={handleSearch}
               autoFocus
             />
             <div className="results-list">
-              {searchResults.map(p => (
-                <div key={p.pokemon_id} className="result-item" onClick={() => handleSelectPokemon(p)}>
+              {searchResults.map((p) => (
+                <div
+                  key={p.pokemon_id}
+                  className="result-item"
+                  onClick={() => handleSelectPokemon(p)}
+                >
                   {p.name} (#{p.dex_number})
                 </div>
               ))}
