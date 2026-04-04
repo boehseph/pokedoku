@@ -131,55 +131,51 @@ const revealRemaining = async () => {
       <h1>PokéDoku</h1>
 
       {/* 1. THE GAME GRID */}
-      <div className="grid-wrapper">
-        {/* Top-Left Empty Corner */}
-        <div className="corner-cell"></div>
+    <div className="grid-wrapper">
+      {/* Row 1: Corner + Column Headers */}
+      <div className="corner-cell"></div>
+      {grid.cols.map((col, index) => (
+        <div key={`col-${col.id}-${index}`} className="header-cell">
+          {col.name}
+        </div>
+      ))}
 
-        {/* Column Headers (Top Row) */}
-        {grid.cols.map((col) => (
-          <div key={col.id} className="header-cell">
-            {col.name}
-          </div>
-        ))}
+      {/* Rows 2, 3, and 4 */}
+      {grid.rows.map((row, rowIndex) => (
+        <React.Fragment key={`row-group-${row.id}`}>
+          {/* Slot 1 of the row: The Header */}
+          <div className="header-cell">{row.name}</div>
 
-        {/* Rows (Each row starts with a Header, then 3 Play Cells) */}
-        {grid.rows.map((row, rowIndex) => (
-          <React.Fragment key={row.id}>
-            {/* Row Header (Left Side) */}
-            <div className="header-cell">{row.name}</div>
+          {/* Slots 2, 3, 4 of the row: The Play Cells */}
+          {[0, 1, 2].map((colIndex) => {
+            const guessedPokemon = guesses[rowIndex][colIndex];
+            const isError = errorCell?.row === rowIndex && errorCell?.col === colIndex;
+            const isSuccess = successCell?.row === rowIndex && successCell?.col === colIndex;
 
-            {/* The 3 Playable Cells for this row */}
-            {[0, 1, 2].map((colIndex) => {
-              const guessedPokemon = guesses[rowIndex][colIndex];
-              const isError = errorCell?.row === rowIndex && errorCell?.col === colIndex;
-
-              return (
-                <div 
-                  className={`play-cell 
-                    ${errorCell?.row === rowIndex && errorCell?.col === colIndex ? 'flash-red' : ''} 
-                    ${successCell?.row === rowIndex && successCell?.col === colIndex ? 'flash-green' : ''}
-                  `}
-                  onClick={() => handleCellClick(rowIndex, colIndex)}
-                >
-                  {guessedPokemon ? (
-                    <div className="sprite-container">
-                      <img
-                        src={getPokemonSprite(guessedPokemon.dex_number)}
-                        alt={guessedPokemon.name}
-                        className="pokemon-sprite"
-                      />
-                      <span className="pokemon-name-label">{guessedPokemon.name}</span>
-                    </div>
-                  ) : (
-                    <div className="empty-slot">+</div>
-                  )}
-                </div>
-              );
-            })}
-          </React.Fragment>
-        ))}
-      </div>
-
+            return (
+              <div 
+                key={`cell-${rowIndex}-${colIndex}`}
+                className={`play-cell ${isError ? 'flash-red' : ''} ${isSuccess ? 'flash-green' : ''}`}
+                onClick={() => handleCellClick(rowIndex, colIndex)}
+              >
+                {guessedPokemon ? (
+                  <div className="sprite-container">
+                    <img
+                      src={getPokemonSprite(guessedPokemon.dex_number)}
+                      alt={guessedPokemon.name}
+                      className="pokemon-sprite"
+                    />
+                    <span className="pokemon-name-label">{guessedPokemon.name}</span>
+                  </div>
+                ) : (
+                  <div className="empty-slot">+</div>
+                )}
+              </div>
+            );
+          })}
+        </React.Fragment>
+      ))}
+    </div>
       {/* 2. STATS & COUNTER */}
       <div className="stats-container">
         <div className="lives-counter">Guesses: {lives}/10</div>
