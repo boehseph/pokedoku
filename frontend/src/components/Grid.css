@@ -1,0 +1,87 @@
+.grid-wrapper {
+  display: grid;
+  grid-template-columns: 100px 150px 150px 150px;
+  grid-template-rows: 100px 150px 150px 150px; 
+  gap: 10px;
+  justify-content: center;
+  margin-top: 50px;
+  width: fit-content; 
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.corner-cell {
+  width: 100px;
+  height: 100px;
+}
+
+.header-cell {
+  background: #333;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border-radius: 8px;
+  text-align: center;
+  padding: 5px;
+  font-size: 0.9rem;
+}
+
+.play-cell {
+  width: 150px;
+  height: 150px;
+  background: #f0f0f0;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.play-cell:hover {
+  background: #e0e0e0;
+}
+
+.pokemon-sprite {
+  width: 100px;
+  height: 100px;
+  image-rendering: pixelated; 
+  display: block;
+  margin: 0 auto;
+}
+
+.sprite-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.pokemon-name-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #444;
+}
+
+.play-cell.flash-red {
+  background-color: rgba(255, 0, 0, 0.4) !important;
+  animation: shake 0.4s ease-in-out;
+}
+
+.play-cell.flash-green {
+  background-color: rgba(76, 175, 80, 0.4) !important;
+  transition: background-color 0.2s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}

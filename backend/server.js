@@ -195,3 +195,36 @@ app.post('/api/get-solutions', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// --- AUTH ROUTES ---
+
+// Login: Check credentials
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  const sql = `SELECT * FROM USERS WHERE username = ? AND password = ?`;
+
+  db.get(sql, [username, password], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (user) {
+      res.json({ success: true, user: { id: user.user_id, name: user.username } });
+    } else {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+  });
+});
+
+// Signup: Add new user
+app.post('/api/signup', (req, res) => {
+  const { username, password } = req.body;
+
+  // First check if username exists
+  db.get(`SELECT * FROM USERS WHERE username = ?`, [username], (err, row) => {
+    if (row) return res.status(400).json({ message: "Username already taken" });
+
+    const insertSql = `INSERT INTO USERS (username, password) VALUES (?, ?)`;
+    db.run(insertSql, [username, password], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, userId: this.lastID });
+    });
+  });
+});

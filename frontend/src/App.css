@@ -1,167 +1,19 @@
-.grid-wrapper {
-  display: grid;
-  /* 1 header column + 3 play columns */
-  grid-template-columns: 100px 150px 150px 150px;
-  /* 1 header row + 3 play rows - THIS LOCKS THE ALIGNMENT */
-  grid-template-rows: 100px 150px 150px 150px; 
-  gap: 10px;
-  justify-content: center;
-  margin-top: 50px;
-  /* Prevents the grid from squishing on small screens */
-  width: fit-content; 
-  margin-left: auto;
-  margin-right: auto;
+/* GLOBAL STYLES */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #ffffff;
 }
 
-/* Ensure the corner cell exists even if empty, so it takes up its slot */
-.corner-cell {
-  width: 100px;
-  height: 100px;
-}
-
-.header-cell {
-  background: #333;
-  color: white;
+/* SIDEBAR LAYOUT WRAPPERS */
+.app-layout {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  /* Remove the height: 100px; from here—the grid handles it now! */
-  border-radius: 8px;
-  text-align: center;
-  padding: 5px;
-  font-size: 0.9rem;
+  min-height: 100vh;
 }
 
-.play-cell {
-  width: 150px;
-  height: 150px;
-  background: #f0f0f0;
-  border: 2px solid #ccc;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.play-cell:hover {
-  background: #e0e0e0;
-}
-
-.pokemon-sprite {
-  width: 100px;
-  height: 100px;
-  /* This prevents the browser from smoothing the pixels */
-  image-rendering: pixelated; 
-  display: block;
-  margin: 0 auto;
-}
-
-.sprite-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-.pokemon-name-label {
-  font-size: 0.8rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  color: #444;
-}
-
-.search-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.7);
-  display: flex; justify-content: center; align-items: center;
-  z-index: 100;
-}
-
-.search-modal {
-  background: white; padding: 20px; border-radius: 12px;
-  width: 300px; text-align: center; position: relative;
-}
-
-.close-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
-
-.results-list { margin-top: 15px; max-height: 200px; overflow-y: auto; }
-
-.result-item {
-  padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;
-}
-
-.result-item:hover { background: #f0f0f0; }
-
-/* Positioning the counter */
-.stats-container {
-  width: 550px; /* Match grid width */
-  margin: 10px auto;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.lives-counter {
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: bold;
-  font-size: 1.2rem;
-  background: #eee;
-  padding: 5px 15px;
-  border-radius: 20px;
-  border: 2px solid #333;
-}
-
-/* The Red Flash Animation */
-.play-cell.flash-red {
-  background-color: rgba(255, 0, 0, 0.4) !important;
-  animation: shake 0.4s ease-in-out;
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
-}
-
-/* Basic Modal Styling */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex; justify-content: center; align-items: center;
-  z-index: 200;
-}
-
-.modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 15px;
-  text-align: center;
-  border: 4px solid #ff4d4d;
-}
-
-.modal-content button {
-  margin-top: 15px;
-  padding: 8px 20px;
-  background: #333;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.play-cell.flash-green {
-  background-color: rgba(76, 175, 80, 0.4) !important; /* Transparent Green */
-  transition: background-color 0.2s;
-}
-
-/* Optional: Add a slight scale effect to correct guesses */
-.play-cell.flash-green .sprite-container {
-  animation: pop 0.3s ease-out;
-}
-
-@keyframes pop {
-  0% { transform: scale(0.8); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+.content-area {
+  margin-left: 80px; /* Space for the 80px sidebar */
+  flex-grow: 1;
+  padding: 20px;
 }
