@@ -63,15 +63,30 @@ function App() {
   };
 
   // --- 3. HANDLE SELECTING A POKEMON ---
-  const handleSelectPokemon = (pokemon: Pokemon) => {
-    if (!activeCell) return;
+  const handleSelectPokemon = async (pokemon: Pokemon) => {
+    if (!activeCell || !grid) return;
 
-    const newGuesses = [...guesses];
-    newGuesses[activeCell.row][activeCell.col] = pokemon;
-    setGuesses(newGuesses);
-    
-    // Close search
-    setActiveCell(null);
+    const rowConstraint = grid.rows[activeCell.row];
+    const colConstraint = grid.cols[activeCell.col];
+
+    try {
+      const res = await axios.post('http://localhost:5000/api/check-guess', {
+        pokemon_id: pokemon.pokemon_id,
+        rowConstraint,
+        colConstraint
+      });
+
+      if (res.data.correct) {
+        const newGuesses = [...guesses];
+        newGuesses[activeCell.row][activeCell.col] = pokemon;
+        setGuesses(newGuesses);
+        setActiveCell(null);
+      } else {
+        alert("Wrong! Try again.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   if (!grid) return <div>Loading PokéDoku...</div>;

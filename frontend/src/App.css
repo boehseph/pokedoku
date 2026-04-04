@@ -52,7 +52,6 @@
   font-weight: bold;
   text-transform: uppercase;
   color: #444;
-  margin-top: -10px; /* Pulls name closer to sprite */
 }
 
 .search-overlay {
