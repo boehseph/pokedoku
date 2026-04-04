@@ -89,8 +89,33 @@ app.get('/api/new-game', async (req, res) => {
       }
       if (possible) isValid = true;
     }
+    
+    // 1. Create the Puzzle record
+    db.run("INSERT INTO PUZZLE (is_daily) VALUES (0)", function(err) {
+      if (err) return res.status(500).send("Error saving puzzle");
+      
+      const puzzle_id = this.lastID;
 
-    res.json({ rows, cols });
+      // 2. Save the constraints so the DB knows what 'Row 1' or 'Col 2' was
+      // This is vital if you want to reconstruct the board on the Profile page later!
+      const insertConstraint = db.prepare(`
+        INSERT INTO PUZZLE_CONSTRAINT (puzzle_id, constraint_id, axis, position) 
+        VALUES (?, ?, ?, ?)
+      `);
+
+      // Rows
+      rows.forEach((r, i) => insertConstraint.run(puzzle_id, r.id, 'row', i + 1));
+      // Cols
+      cols.forEach((c, i) => insertConstraint.run(puzzle_id, c.id, 'column', i + 1));
+      
+      insertConstraint.finalize();
+
+      res.json({ 
+        puzzle_id, 
+        rows, 
+        cols 
+      });
+    });
   } catch (err) {
     res.status(500).send("Error generating grid");
   }
@@ -179,9 +204,6 @@ app.post('/api/get-solutions', async (req, res) => {
   }
 });
 
-// --- AUTH ROUTES ---
-
-// --- SIGNUP ROUTE ---
 app.post('/api/signup', (req, res) => {
     const { username, password } = req.body;
 
@@ -205,7 +227,6 @@ app.post('/api/signup', (req, res) => {
     });
 });
 
-// --- LOGIN ROUTE ---
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
 
@@ -227,5 +248,45 @@ app.post('/api/login', (req, res) => {
             // Wrong username or password
             res.status(401).json({ success: false, message: "Invalid username or password." });
         }
+    });
+});
+
+app.post('/api/save-attempt', (req, res) => {
+    const { user_id, puzzle_id, guesses, score, did_complete } = req.body;
+
+    // 1. Insert into ATTEMPT
+    const attemptQuery = `
+        INSERT INTO ATTEMPT (user_id, puzzle_id, guesses_remaining, did_complete, score)
+        VALUES (?, ?, ?, ?, ?)`;
+
+    db.run(attemptQuery, [user_id, puzzle_id, 0, did_complete, score], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        const attemptId = this.lastID;
+
+        // 2. Insert each cell into ATTEMPT_CELL
+        const cellQuery = `
+            INSERT INTO ATTEMPT_CELL (attempt_id, row_pos, col_pos, pokemon_id, is_correct)
+            VALUES (?, ?, ?, ?, 1)`;
+
+        const statements = [];
+        guesses.forEach((row, rowIndex) => {
+            row.forEach((pokemon, colIndex) => {
+                if (pokemon) {
+                    statements.push([attemptId, rowIndex + 1, colIndex + 1, pokemon.pokemon_id]);
+                }
+            });
+        });
+
+        // Simple way to run multiple inserts in SQLite
+        let completed = 0;
+        statements.forEach(params => {
+            db.run(cellQuery, params, () => {
+                completed++;
+                if (completed === statements.length) {
+                    res.json({ success: true, attemptId });
+                }
+            });
+        });
     });
 });

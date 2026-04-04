@@ -4,12 +4,7 @@ import Grid from '../components/Grid';
 import SearchOverlay from '../components/SearchOverlay';
 import StatusModal from '../components/StatusModal';
 import "./GamePage.css";
-
-interface Pokemon {
-  pokemon_id: number;
-  dex_number: number;
-  name: string;
-}
+import { useNavigate } from 'react-router-dom';
 
 interface GamePageProps {
   grid: any;
@@ -18,10 +13,11 @@ interface GamePageProps {
   setGuesses: (g: any[][]) => void;
   lives: number;
   setLives: React.Dispatch<React.SetStateAction<number>>;
+  user: { id: number; username: string } | null;
 }
 
 const GamePage: React.FC<GamePageProps> = ({ 
-  grid, setGrid, guesses, setGuesses, lives, setLives 
+  grid, setGrid, guesses, setGuesses, lives, setLives, user
 }) => {
   // Keep local "UI-only" state here (things that reset every time we visit the page)
   const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
@@ -30,11 +26,10 @@ const GamePage: React.FC<GamePageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [modalMessage, setModalMessage] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const getPokemonSprite = (dexNumber: number) => 
     `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/emerald/${dexNumber}.png`;
-
-  // REMOVED: The useEffect that calls /api/new-game is now in App.tsx
 
   const handleCellClick = (row: number, col: number) => {
     if (lives <= 0) {
@@ -73,7 +68,15 @@ const GamePage: React.FC<GamePageProps> = ({
       if (res.data.correct) {
         const newGuesses = [...guesses];
         newGuesses[activeCell.row][activeCell.col] = pokemon;
-        setGuesses(newGuesses); // Updates App.tsx state
+        setGuesses(newGuesses); 
+
+        // CHECK FOR COMPLETION (All 9 cells filled)
+        const totalFilled = newGuesses.flat().filter(cell => cell !== null).length;
+
+        if (totalFilled === 9) {
+            handleGameComplete(newGuesses);
+        }
+
         setSuccessCell({ row: activeCell.row, col: activeCell.col });
         setTimeout(() => setSuccessCell(null), 500);
       } else {
@@ -94,6 +97,24 @@ const GamePage: React.FC<GamePageProps> = ({
     );
     setGuesses(finalGrid);
     setModalMessage(null); 
+  };
+
+  const handleGameComplete = async (finalGuesses: any[][]) => {
+    if (user) {
+        // Save to DB automatically if logged in
+        try {
+            await axios.post('http://localhost:5000/api/save-attempt', {
+                user_id: user.id,
+                puzzle_id: grid.puzzle_id, // Ensure your /api/new-game returns the puzzle_id!
+                guesses: finalGuesses,
+                score: 9,
+                did_complete: true
+            });
+            setModalMessage("COMPLETED_LOGGED_IN");
+        } catch (e) { console.error("Save failed", e); }
+    } else {
+        setModalMessage("COMPLETED_GUEST");
+    }
   };
 
   if (!grid) return <div className="loading">Loading PokéDoku...</div>;

@@ -31,7 +31,7 @@ function App() {
         <Sidebar isLoggedIn={!!user} />
         <main className="content-area">
           <Routes>
-            <Route path="/" element={<GamePage {...gameState} />} />
+            <Route path="/" element={<GamePage {...gameState} user={user} />} />
             <Route path="/auth" element={<AuthPage onLoginSuccess={handleLogin} />} />
             <Route path="/profile" element={
               <ProfilePage user={user} onLogout={gameState.handleLogout} />
