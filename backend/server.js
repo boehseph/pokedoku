@@ -5,6 +5,21 @@ const cors = require('cors');
 const app = express();
 const PORT = 5000;
 
+const getSubQuery = (constraint) => {
+  switch (constraint.kind) {
+    case 'TYPE': 
+      return `SELECT pokemon_id FROM POKEMON_TYPE WHERE type_id = ${constraint.id}`;
+    case 'REGION': 
+      return `SELECT pokemon_id FROM POKEMON WHERE region_id = ${constraint.id}`;
+    case 'ABILITY': 
+      return `SELECT pokemon_id FROM POKEMON_ABILITY WHERE ability_id = ${constraint.id}`;
+    case 'EVO': 
+      return `SELECT pokemon_id FROM POKEMON WHERE evo_stage_id = ${constraint.id}`;
+    default: 
+      return `SELECT pokemon_id FROM POKEMON`;
+  }
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -29,20 +44,6 @@ app.listen(PORT, () => {
 
 // Helper to check if a Pokemon exists for TWO specific constraints
 async function doesPokemonExist(c1, c2) {
-  const getSubQuery = (constraint) => {
-    switch (constraint.kind) {
-      case 'TYPE': 
-        return `SELECT pokemon_id FROM POKEMON_TYPE WHERE type_id = ${constraint.id}`;
-      case 'REGION': 
-        return `SELECT pokemon_id FROM POKEMON WHERE region_id = ${constraint.id}`;
-      case 'ABILITY': 
-        return `SELECT pokemon_id FROM POKEMON_ABILITY WHERE ability_id = ${constraint.id}`;
-      case 'EVO': 
-        return `SELECT pokemon_id FROM POKEMON WHERE evo_stage_id = ${constraint.id}`;
-      default: return '';
-    }
-  };
-
   const sql = `
     SELECT COUNT(*) as count 
     FROM (${getSubQuery(c1)}) a 
@@ -156,5 +157,41 @@ app.post('/api/check-guess', async (req, res) => {
     res.json({ correct: true });
   } else {
     res.json({ correct: false, message: "That Pokémon doesn't fit the criteria!" });
+  }
+});
+
+app.post('/api/get-solutions', async (req, res) => {
+  try {
+    const { rows, cols } = req.body;
+    // We create a 3x3 array to hold the answers
+    const solutionGrid = [[], [], []];
+
+    // Loop through each cell in the 3x3
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        const sql = `
+          SELECT p.pokemon_id, p.dex_number, p.name 
+          FROM POKEMON p
+          WHERE p.pokemon_id IN (
+            ${getSubQuery(rows[i])} 
+            INTERSECT 
+            ${getSubQuery(cols[j])}
+          )
+          LIMIT 1`;
+        
+        const pokemon = await new Promise((resolve, reject) => {
+          db.get(sql, [], (err, row) => {
+            if (err) reject(err);
+            resolve(row);
+          });
+        });
+        
+        solutionGrid[i][j] = pokemon || null;
+      }
+    }
+    res.json(solutionGrid);
+  } catch (err) {
+    console.error("SOLUTIONS ERROR:", err); // This will show in your terminal
+    res.status(500).json({ error: err.message });
   }
 });
