@@ -1,0 +1,36 @@
+.sidebar {
+  width: 80px;
+  background: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 40px;
+  gap: 30px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  color: white;
+  z-index: 1000;
+  border-right: 1px solid #333;
+}
+
+.nav-item {
+  color: #888;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.nav-item:hover, .nav-item.active {
+  color: #ff4d4d; /* Pokéball Red */
+}
+
+.nav-item span {
+  margin-top: 5px;
+  font-weight: bold;
+}

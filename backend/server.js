@@ -42,35 +42,54 @@ app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 
-// Helper to check if a Pokemon exists for TWO specific constraints
-async function doesPokemonExist(c1, c2) {
+async function getValidPokemonName(c1, c2) {
+  // We join the results of your two subqueries (a and b) 
+  // with the POKEMON table (p) to get the name
   const sql = `
-    SELECT COUNT(*) as count 
-    FROM (${getSubQuery(c1)}) a 
-    INNER JOIN (${getSubQuery(c2)}) b ON a.pokemon_id = b.pokemon_id
+    SELECT p.name 
+    FROM POKEMON p
+    INNER JOIN (${getSubQuery(c1)}) a ON p.pokemon_id = a.pokemon_id
+    INNER JOIN (${getSubQuery(c2)}) b ON p.pokemon_id = b.pokemon_id
+    LIMIT 1
   `;
 
   return new Promise((resolve) => {
-    db.get(sql, [], (err, row) => resolve(row?.count > 0));
-  });
-}
-
-// Helper to check if a cell is possible
-// This works for Types, but can be expanded for Regions/Gens later
-async function isCellValid(rowId, colId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT COUNT(*) as count 
-      FROM POKEMON_TYPE pt1
-      JOIN POKEMON_TYPE pt2 ON pt1.pokemon_id = pt2.pokemon_id
-      WHERE pt1.type_id = ? AND pt2.type_id = ?
-    `;
-    db.get(sql, [rowId, colId], (err, row) => {
-      if (err) reject(err);
-      resolve(row.count > 0);
+    db.get(sql, [], (err, row) => {
+      if (err) {
+        console.error("Query Error:", err);
+        resolve(null);
+      }
+      resolve(row ? row.name : null);
     });
   });
 }
+
+app.get('/api/user-attempts/:userId', (req, res) => {
+    const query = `
+        SELECT a.attempt_id, a.score, p.created_date 
+        FROM ATTEMPT a
+        JOIN PUZZLE p ON a.puzzle_id = p.puzzle_id
+        WHERE a.user_id = ? AND a.did_complete = 1
+        ORDER BY p.created_date DESC`;
+    
+    db.all(query, [req.params.userId], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.get('/api/attempt-details/:attemptId', (req, res) => {
+    const query = `
+        SELECT ac.row_pos, ac.col_pos, p.name, p.dex_number, p.pokemon_id
+        FROM ATTEMPT_CELL ac
+        JOIN POKEMON p ON ac.pokemon_id = p.pokemon_id
+        WHERE ac.attempt_id = ?`;
+    
+    db.all(query, [req.params.attemptId], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
 
 app.get('/api/new-game', async (req, res) => {
   try {
@@ -86,28 +105,65 @@ app.get('/api/new-game', async (req, res) => {
 
     let rows, cols;
     let isValid = false;
+    let cheatSheet = [];
 
     while (!isValid) {
-      // Pick 6 unique random constraints from the big pool
       const shuffled = allOptions.sort(() => 0.5 - Math.random());
       rows = shuffled.slice(0, 3);
       cols = shuffled.slice(3, 6);
 
-      // Check all 9 intersections
       let possible = true;
+      cheatSheet = []; // Reset for this attempt
+
       for (let r of rows) {
+        let rowNames = [];
         for (let c of cols) {
-          if (!(await doesPokemonExist(r, c))) {
-            possible = false; 
+          const name = await getValidPokemonName(r, c); 
+          if (!name) {
+            possible = false;
             break;
           }
+          rowNames.push(name);
         }
         if (!possible) break;
+        cheatSheet.push(rowNames);
       }
+      
       if (possible) isValid = true;
     }
 
-    res.json({ rows, cols });
+    // --- THE TEST LOG ---
+    // This will print a nice 3x3 table in your VS Code / Terminal console
+    console.log("\n--- TESTER CHEAT SHEET (SOLUTIONS) ---");
+    console.table(cheatSheet);
+    console.log("--------------------------------------\n");
+    
+    // 1. Create the Puzzle record
+    db.run("INSERT INTO PUZZLE (is_daily) VALUES (0)", function(err) {
+      if (err) return res.status(500).send("Error saving puzzle");
+      
+      const puzzle_id = this.lastID;
+
+      // 2. Save the constraints so the DB knows what 'Row 1' or 'Col 2' was
+      // This is vital if you want to reconstruct the board on the Profile page later!
+      const insertConstraint = db.prepare(`
+        INSERT INTO PUZZLE_CONSTRAINT (puzzle_id, constraint_id, axis, position) 
+        VALUES (?, ?, ?, ?)
+      `);
+
+      // Rows
+      rows.forEach((r, i) => insertConstraint.run(puzzle_id, r.id, 'row', i + 1));
+      // Cols
+      cols.forEach((c, i) => insertConstraint.run(puzzle_id, c.id, 'column', i + 1));
+      
+      insertConstraint.finalize();
+
+      res.json({ 
+        puzzle_id, 
+        rows, 
+        cols 
+      });
+    });
   } catch (err) {
     res.status(500).send("Error generating grid");
   }
@@ -196,35 +252,91 @@ app.post('/api/get-solutions', async (req, res) => {
   }
 });
 
-// --- AUTH ROUTES ---
+app.post('/api/signup', (req, res) => {
+    const { username, password } = req.body;
 
-// Login: Check credentials
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const sql = `SELECT * FROM USERS WHERE username = ? AND password = ?`;
-
-  db.get(sql, [username, password], (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (user) {
-      res.json({ success: true, user: { id: user.user_id, name: user.username } });
-    } else {
-      res.status(401).json({ success: false, message: "Invalid credentials" });
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Missing credentials" });
     }
-  });
+
+    const query = `INSERT INTO USER (username, password) VALUES (?, ?)`;
+    
+    db.run(query, [username, password], function(err) {
+        if (err) {
+            // Check if error is because username already exists
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ success: false, message: "Username already taken." });
+            }
+            console.error("Signup Error:", err.message);
+            return res.status(500).json({ success: false, message: "Database error during signup." });
+        }
+        // Success! Return the new user ID
+        res.json({ success: true, userId: this.lastID });
+    });
 });
 
-// Signup: Add new user
-app.post('/api/signup', (req, res) => {
-  const { username, password } = req.body;
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
 
-  // First check if username exists
-  db.get(`SELECT * FROM USERS WHERE username = ?`, [username], (err, row) => {
-    if (row) return res.status(400).json({ message: "Username already taken" });
+    const query = `SELECT * FROM USER WHERE username = ? AND password = ?`;
 
-    const insertSql = `INSERT INTO USERS (username, password) VALUES (?, ?)`;
-    db.run(insertSql, [username, password], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true, userId: this.lastID });
+    db.get(query, [username, password], (err, row) => {
+        if (err) {
+            console.error("Login Error:", err.message);
+            return res.status(500).json({ success: false, message: "Database error during login." });
+        }
+
+        if (row) {
+            // Found them!
+            res.json({ 
+                success: true, 
+                user: { id: row.user_id, username: row.username } 
+            });
+        } else {
+            // Wrong username or password
+            res.status(401).json({ success: false, message: "Invalid username or password." });
+        }
     });
+});
+
+app.post('/api/save-attempt', (req, res) => {
+  console.log("Saving attempt for user:", req.body.user_id);
+  const { user_id, puzzle_id, guesses, score, did_complete } = req.body;
+
+  // 1. Insert into ATTEMPT
+  const attemptQuery = `
+      INSERT INTO ATTEMPT (user_id, puzzle_id, guesses_remaining, did_complete, score)
+      VALUES (?, ?, ?, ?, ?)`;
+
+  db.run(attemptQuery, [user_id, puzzle_id, 0, did_complete, score], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      
+      const attemptId = this.lastID;
+      console.log("New Attempt ID:", attemptId);
+
+      // 2. Insert each cell into ATTEMPT_CELL
+      const cellQuery = `
+          INSERT INTO ATTEMPT_CELL (attempt_id, row_pos, col_pos, pokemon_id, is_correct)
+          VALUES (?, ?, ?, ?, 1)`;
+
+      const statements = [];
+      guesses.forEach((row, rowIndex) => {
+          row.forEach((pokemon, colIndex) => {
+              if (pokemon) {
+                  statements.push([attemptId, rowIndex + 1, colIndex + 1, pokemon.pokemon_id]);
+              }
+          });
+      });
+
+      // Simple way to run multiple inserts in SQLite
+      let completed = 0;
+      statements.forEach(params => {
+          db.run(cellQuery, params, () => {
+              completed++;
+              if (completed === statements.length) {
+                  res.json({ success: true, attemptId });
+              }
+          });
+      });
   });
 });

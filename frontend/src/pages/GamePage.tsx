@@ -4,34 +4,36 @@ import Grid from '../components/Grid';
 import SearchOverlay from '../components/SearchOverlay';
 import StatusModal from '../components/StatusModal';
 import "./GamePage.css";
+import { useNavigate } from 'react-router-dom';
 
-interface Pokemon {
-  pokemon_id: number;
-  dex_number: number;
-  name: string;
+interface GamePageProps {
+  grid: any;
+  setGrid: (g: any) => void;
+  guesses: any[][];
+  setGuesses: (g: any[][]) => void;
+  lives: number;
+  setLives: React.Dispatch<React.SetStateAction<number>>;
+  user: { id: number; username: string } | null;
+  pendingBoard: any;
+  setPendingBoard: (b: any) => void;
+  
 }
 
-const GamePage = () => {
-  const [grid, setGrid] = useState<any>(null);
-  const [guesses, setGuesses] = useState<(Pokemon | null)[][]>([
-    [null, null, null], [null, null, null], [null, null, null]
-  ]);
+const GamePage: React.FC<GamePageProps> = ({ 
+  grid, setGrid, guesses, setGuesses, lives, setLives, user, pendingBoard, setPendingBoard
+}) => {
+  // Keep local "UI-only" state here (things that reset every time we visit the page)
   const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
   const [successCell, setSuccessCell] = useState<{row: number, col: number} | null>(null);
   const [errorCell, setErrorCell] = useState<{row: number, col: number} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<Pokemon[]>([]);
-  const [lives, setLives] = useState(10);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [modalMessage, setModalMessage] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState(false);
+  const navigate = useNavigate();
 
   const getPokemonSprite = (dexNumber: number) => 
     `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/emerald/${dexNumber}.png`;
-
-  useEffect(() => {
-    axios.get('http://localhost:5000/api/new-game')
-      .then(res => setGrid(res.data))
-      .catch(err => console.error(err));
-  }, []);
 
   const handleCellClick = (row: number, col: number) => {
     if (lives <= 0) {
@@ -55,9 +57,11 @@ const GamePage = () => {
     }
   };
 
-  const handleSelectPokemon = async (pokemon: Pokemon) => {
+  const handleSelectPokemon = async (pokemon: any) => {
     if (!activeCell || !grid || lives <= 0) return;
+    
     setLives(prev => prev - 1);
+    
     try {
       const res = await axios.post('http://localhost:5000/api/check-guess', {
         pokemon_id: pokemon.pokemon_id,
@@ -68,7 +72,15 @@ const GamePage = () => {
       if (res.data.correct) {
         const newGuesses = [...guesses];
         newGuesses[activeCell.row][activeCell.col] = pokemon;
-        setGuesses(newGuesses);
+        setGuesses(newGuesses); 
+
+        // CHECK FOR COMPLETION (All 9 cells filled)
+        const totalFilled = newGuesses.flat().filter(cell => cell !== null).length;
+
+        if (totalFilled === 9) {
+            handleGameComplete(newGuesses);
+        }
+
         setSuccessCell({ row: activeCell.row, col: activeCell.col });
         setTimeout(() => setSuccessCell(null), 500);
       } else {
@@ -91,8 +103,46 @@ const GamePage = () => {
     setModalMessage(null); 
   };
 
-  if (!grid) return <div className="loading">Loading PokéDoku...</div>;
+  // 1. Helper function to keep things DRY (Don't Repeat Yourself)
+  const saveToDatabase = async (userId: number, puzzleId: number, finalGuesses: any[][]) => {
+    setPendingBoard(null);
+    try {
+      console.log(`Saving puzzle ${puzzleId} for user ${userId}...`);
+      await axios.post('http://localhost:5000/api/save-attempt', {
+        user_id: userId,
+        puzzle_id: puzzleId,
+        guesses: finalGuesses,
+        score: 9,
+        did_complete: true
+      });
+      setPendingSave(false);
+      setModalMessage("COMPLETED_LOGGED_IN");
+    } catch (e) {
+      console.error("Save failed:", e);
+    }
+  };
 
+  // 2. The main completion trigger
+const handleGameComplete = (finalGuesses: any[][]) => {
+    if (user) {
+      saveToDatabase(user.id, grid.puzzle_id, finalGuesses);
+    } else {
+      // Store the board in App.tsx memory
+      setPendingBoard({ puzzle_id: grid.puzzle_id, guesses: finalGuesses });
+      setModalMessage("COMPLETED_GUEST");
+    }
+  };
+
+  // 3. The "Late Login" Watcher
+  useEffect(() => {
+    // Only fire if we have a user AND a board waiting to be saved
+    if (user && pendingBoard) {
+      saveToDatabase(user.id, pendingBoard.puzzle_id, pendingBoard.guesses);
+    }
+  }, [user, pendingSave, grid, guesses]);
+
+  if (!grid) return <div className="loading">Loading PokéDoku...</div>;
+  
   return (
     <div className="game-container">
       <h1>PokéDoku</h1>
