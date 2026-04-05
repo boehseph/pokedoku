@@ -1,43 +1,86 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useCallback, useEffect, useState } from 'react';
+import { api } from '../api';
 import Grid from '../components/Grid';
 import SearchOverlay from '../components/SearchOverlay';
 import StatusModal from '../components/StatusModal';
-import "./GamePage.css";
-import { useNavigate } from 'react-router-dom';
+import { getPokemonSpriteUrl } from '../utils/pokemon';
+import type { NewGameResponse, PendingBoard, PokemonPick, UserSession } from '../types';
+import './GamePage.css';
 
 interface GamePageProps {
-  grid: any;
-  setGrid: (g: any) => void;
-  guesses: any[][];
-  setGuesses: (g: any[][]) => void;
+  grid: NewGameResponse | null;
+  setGrid: (g: NewGameResponse | null) => void;
+  guesses: (PokemonPick | null)[][];
+  setGuesses: (g: (PokemonPick | null)[][]) => void;
   lives: number;
   setLives: React.Dispatch<React.SetStateAction<number>>;
-  user: { id: number; username: string } | null;
-  pendingBoard: any;
-  setPendingBoard: (b: any) => void;
-  
+  user: UserSession | null;
+  pendingBoard: PendingBoard | null;
+  setPendingBoard: (b: PendingBoard | null) => void;
 }
 
-const GamePage: React.FC<GamePageProps> = ({ 
-  grid, setGrid, guesses, setGuesses, lives, setLives, user, pendingBoard, setPendingBoard
-}) => {
-  // Keep local "UI-only" state here (things that reset every time we visit the page)
-  const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
-  const [successCell, setSuccessCell] = useState<{row: number, col: number} | null>(null);
-  const [errorCell, setErrorCell] = useState<{row: number, col: number} | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [modalMessage, setModalMessage] = useState<string | null>(null);
-  const [pendingSave, setPendingSave] = useState(false);
-  const navigate = useNavigate();
+interface SearchHit {
+  pokemon_id: number;
+  dex_number: number;
+  name: string;
+}
 
-  const getPokemonSprite = (dexNumber: number) => 
-    `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/emerald/${dexNumber}.png`;
+const GamePage: React.FC<GamePageProps> = ({
+  grid,
+  setGrid: _setGrid,
+  guesses,
+  setGuesses,
+  lives,
+  setLives,
+  user,
+  pendingBoard,
+  setPendingBoard,
+}) => {
+  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
+  const [successCell, setSuccessCell] = useState<{ row: number; col: number } | null>(null);
+  const [errorCell, setErrorCell] = useState<{ row: number; col: number } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
+
+  const saveToDatabase = useCallback(
+    async (userId: number, puzzleId: number, finalGuesses: (PokemonPick | null)[][]) => {
+      setPendingBoard(null);
+      try {
+        await api.post('/api/save-attempt', {
+          user_id: userId,
+          puzzle_id: puzzleId,
+          guesses: finalGuesses,
+          score: 9,
+          did_complete: true,
+        });
+        setModalMessage('COMPLETED_LOGGED_IN');
+      } catch (e) {
+        console.error('Save failed:', e);
+      }
+    },
+    [setPendingBoard]
+  );
+
+  const handleGameComplete = (finalGuesses: (PokemonPick | null)[][]) => {
+    if (!grid) return;
+    if (user) {
+      saveToDatabase(user.id, grid.puzzle_id, finalGuesses);
+    } else {
+      setPendingBoard({ puzzle_id: grid.puzzle_id, guesses: finalGuesses });
+      setModalMessage('COMPLETED_GUEST');
+    }
+  };
+
+  useEffect(() => {
+    if (user && pendingBoard) {
+      saveToDatabase(user.id, pendingBoard.puzzle_id, pendingBoard.guesses);
+    }
+  }, [user, pendingBoard, saveToDatabase]);
 
   const handleCellClick = (row: number, col: number) => {
     if (lives <= 0) {
-      setModalMessage("Game Over! You ran out of guesses.");
+      setModalMessage('Game Over! You ran out of guesses.');
       return;
     }
     if (guesses[row][col]) return;
@@ -50,35 +93,33 @@ const GamePage: React.FC<GamePageProps> = ({
     const value = e.target.value;
     setSearchTerm(value);
     if (value.length > 1) {
-      const res = await axios.get(`http://localhost:5000/api/pokemon/search?q=${value}`);
+      const res = await api.get<SearchHit[]>('/api/pokemon/search', { params: { q: value } });
       setSearchResults(res.data);
     } else {
       setSearchResults([]);
     }
   };
 
-  const handleSelectPokemon = async (pokemon: any) => {
+  const handleSelectPokemon = async (pokemon: PokemonPick) => {
     if (!activeCell || !grid || lives <= 0) return;
-    
-    setLives(prev => prev - 1);
-    
+
+    setLives((prev) => prev - 1);
+
     try {
-      const res = await axios.post('http://localhost:5000/api/check-guess', {
+      const res = await api.post<{ correct: boolean; message?: string }>('/api/check-guess', {
         pokemon_id: pokemon.pokemon_id,
         rowConstraint: grid.rows[activeCell.row],
-        colConstraint: grid.cols[activeCell.col]
+        colConstraint: grid.cols[activeCell.col],
       });
 
       if (res.data.correct) {
-        const newGuesses = [...guesses];
+        const newGuesses = guesses.map((row) => [...row]);
         newGuesses[activeCell.row][activeCell.col] = pokemon;
-        setGuesses(newGuesses); 
+        setGuesses(newGuesses);
 
-        // CHECK FOR COMPLETION (All 9 cells filled)
-        const totalFilled = newGuesses.flat().filter(cell => cell !== null).length;
-
+        const totalFilled = newGuesses.flat().filter((cell) => cell !== null).length;
         if (totalFilled === 9) {
-            handleGameComplete(newGuesses);
+          handleGameComplete(newGuesses);
         }
 
         setSuccessCell({ row: activeCell.row, col: activeCell.col });
@@ -89,82 +130,50 @@ const GamePage: React.FC<GamePageProps> = ({
         setModalMessage(`${pokemon.name} is incorrect!`);
       }
       setActiveCell(null);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const revealRemaining = async () => {
-    const res = await axios.post('http://localhost:5000/api/get-solutions', {
-      rows: grid.rows, cols: grid.cols
+    if (!grid) return;
+    const res = await api.post<(PokemonPick | null)[][]>('/api/get-solutions', {
+      rows: grid.rows,
+      cols: grid.cols,
     });
-    const finalGrid = guesses.map((row, i) => 
-      row.map((cell, j) => cell || res.data[i][j])
-    );
+    const finalGrid = guesses.map((row, i) => row.map((cell, j) => cell || res.data[i][j]));
     setGuesses(finalGrid);
-    setModalMessage(null); 
+    setModalMessage(null);
   };
-
-  // 1. Helper function to keep things DRY (Don't Repeat Yourself)
-  const saveToDatabase = async (userId: number, puzzleId: number, finalGuesses: any[][]) => {
-    setPendingBoard(null);
-    try {
-      console.log(`Saving puzzle ${puzzleId} for user ${userId}...`);
-      await axios.post('http://localhost:5000/api/save-attempt', {
-        user_id: userId,
-        puzzle_id: puzzleId,
-        guesses: finalGuesses,
-        score: 9,
-        did_complete: true
-      });
-      setPendingSave(false);
-      setModalMessage("COMPLETED_LOGGED_IN");
-    } catch (e) {
-      console.error("Save failed:", e);
-    }
-  };
-
-  // 2. The main completion trigger
-const handleGameComplete = (finalGuesses: any[][]) => {
-    if (user) {
-      saveToDatabase(user.id, grid.puzzle_id, finalGuesses);
-    } else {
-      // Store the board in App.tsx memory
-      setPendingBoard({ puzzle_id: grid.puzzle_id, guesses: finalGuesses });
-      setModalMessage("COMPLETED_GUEST");
-    }
-  };
-
-  // 3. The "Late Login" Watcher
-  useEffect(() => {
-    // Only fire if we have a user AND a board waiting to be saved
-    if (user && pendingBoard) {
-      saveToDatabase(user.id, pendingBoard.puzzle_id, pendingBoard.guesses);
-    }
-  }, [user, pendingSave, grid, guesses]);
 
   if (!grid) return <div className="loading">Loading PokéDoku...</div>;
-  
+
   return (
     <div className="game-container">
       <h1>PokéDoku</h1>
-      <Grid 
-        grid={grid} 
-        guesses={guesses} 
+      <Grid
+        grid={grid}
+        guesses={guesses}
         handleCellClick={handleCellClick}
         errorCell={errorCell}
         successCell={successCell}
-        getPokemonSprite={getPokemonSprite}
+        getPokemonSprite={getPokemonSpriteUrl}
       />
       <div className="stats-container">
         <div className="lives-counter">Guesses: {lives}/10</div>
       </div>
-      <SearchOverlay 
-        activeCell={activeCell} grid={grid} 
-        searchTerm={searchTerm} searchResults={searchResults}
-        onSearch={handleSearch} onSelect={handleSelectPokemon}
+      <SearchOverlay
+        activeCell={activeCell}
+        grid={grid}
+        searchTerm={searchTerm}
+        searchResults={searchResults}
+        onSearch={handleSearch}
+        onSelect={handleSelectPokemon}
         onClose={() => setActiveCell(null)}
       />
-      <StatusModal 
-        message={modalMessage} lives={lives}
+      <StatusModal
+        message={modalMessage}
+        lives={lives}
         onClose={() => setModalMessage(null)}
         onReveal={revealRemaining}
       />

@@ -1,21 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import './ProfilePage.css';
+import { api } from '../api';
 import CompletedGrid from '../components/CompletedGrid';
+import type { UserSession } from '../types';
+import './ProfilePage.css';
 
 interface ProfileProps {
-  user: { id: number; username: string } | null;
+  user: UserSession | null;
   onLogout: () => void;
 }
 
+interface AttemptSummary {
+  attempt_id: number;
+  score: number;
+  created_date: string;
+}
+
+function formatAttemptDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 const ProfilePage: React.FC<ProfileProps> = ({ user, onLogout }) => {
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<AttemptSummary[]>([]);
 
   useEffect(() => {
     if (user) {
-      axios.get(`http://localhost:5000/api/user-attempts/${user.id}`)
-        .then(res => setHistory(res.data))
-        .catch(err => console.error("History fetch error:", err));
+      api
+        .get<AttemptSummary[]>(`/api/user-attempts/${user.id}`)
+        .then((res) => setHistory(res.data))
+        .catch((err) => console.error('History fetch error:', err));
     }
   }, [user]);
 
@@ -23,26 +43,38 @@ const ProfilePage: React.FC<ProfileProps> = ({ user, onLogout }) => {
     <div className="profile-page">
       <div className="profile-header">
         <h1>Trainer {user?.username}</h1>
-        <button onClick={onLogout} className="logout-btn">Logout</button>
+        <button type="button" onClick={onLogout} className="logout-btn">
+          Logout
+        </button>
       </div>
       <section className="history-section">
         <h2>Completed Puzzles</h2>
         {history.length === 0 ? (
-          <p>No completed puzzles yet. Go catch 'em all!</p>
+          <p className="history-empty">No completed puzzles yet. Go catch &apos;em all!</p>
         ) : (
-          <div className="attempts-list">
-              {history.map((attempt) => (
-              <div key={attempt.attempt_id} className="attempt-card">
-                <div className="attempt-info">
-                  <strong>{new Date(attempt.created_date).toLocaleDateString()}</strong>
-                  <span className="score-tag">{attempt.score}/9</span>
-                </div>
-                
-                {/* This is the new part! */}
-                <CompletedGrid attemptId={attempt.attempt_id} />
-              </div>
+          <ul className="attempts-list">
+            {history.map((attempt) => (
+              <li key={attempt.attempt_id}>
+                <article className="attempt-card">
+                  <header className="attempt-card-header">
+                    <time
+                      className="attempt-date"
+                      dateTime={attempt.created_date}
+                      title={attempt.created_date}
+                    >
+                      {formatAttemptDate(attempt.created_date)}
+                    </time>
+                    <span className="score-tag" aria-label={`Score ${attempt.score} out of 9`}>
+                      {attempt.score}/9
+                    </span>
+                  </header>
+                  <div className="attempt-card-body">
+                    <CompletedGrid attemptId={attempt.attempt_id} />
+                  </div>
+                </article>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </section>
     </div>
