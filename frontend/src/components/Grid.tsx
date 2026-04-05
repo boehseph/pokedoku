@@ -1,24 +1,34 @@
 import React from 'react';
-import "./Grid.css";
+import type { NewGameResponse, PokemonPick } from '../types';
+import './Grid.css';
 
 interface GridProps {
-  grid: any;
-  guesses: any[][];
+  grid: NewGameResponse;
+  guesses: (PokemonPick | null)[][];
   handleCellClick: (row: number, col: number) => void;
-  errorCell: any;
-  successCell: any;
+  errorCell: { row: number; col: number } | null;
+  successCell: { row: number; col: number } | null;
   getPokemonSprite: (dex: number) => string;
 }
 
-const Grid: React.FC<GridProps> = ({ grid, guesses, handleCellClick, errorCell, successCell, getPokemonSprite }) => {
+const Grid: React.FC<GridProps> = ({
+  grid,
+  guesses,
+  handleCellClick,
+  errorCell,
+  successCell,
+  getPokemonSprite,
+}) => {
   return (
     <div className="grid-wrapper">
       <div className="corner-cell"></div>
-      {grid.cols.map((col: any, index: number) => (
-        <div key={`col-${col.id}-${index}`} className="header-cell">{col.name}</div>
+      {grid.cols.map((col, index) => (
+        <div key={`col-${col.id}-${index}`} className="header-cell">
+          {col.name}
+        </div>
       ))}
 
-      {grid.rows.map((row: any, rowIndex: number) => (
+      {grid.rows.map((row, rowIndex) => (
         <React.Fragment key={`row-group-${row.id}`}>
           <div className="header-cell">{row.name}</div>
           {[0, 1, 2].map((colIndex) => {
@@ -27,17 +37,21 @@ const Grid: React.FC<GridProps> = ({ grid, guesses, handleCellClick, errorCell, 
             const isSuccess = successCell?.row === rowIndex && successCell?.col === colIndex;
 
             return (
-              <div 
+              <div
                 key={`cell-${rowIndex}-${colIndex}`}
                 className={`play-cell ${isError ? 'flash-red' : ''} ${isSuccess ? 'flash-green' : ''}`}
                 onClick={() => handleCellClick(rowIndex, colIndex)}
               >
                 {pokemon ? (
                   <div className="sprite-container">
-                    <img src={getPokemonSprite(pokemon.dex_number)} alt={pokemon.name} className="pokemon-sprite" />
+                    <img
+                      src={getPokemonSprite(pokemon.dex_number)}
+                      alt={pokemon.name}
+                      className="pokemon-sprite"
+                    />
                     <span className="pokemon-name-label">{pokemon.name}</span>
                   </div>
-                ) : <div className="empty-slot">+</div>}
+                ) : null}
               </div>
             );
           })}
