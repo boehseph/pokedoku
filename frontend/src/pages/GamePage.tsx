@@ -14,10 +14,13 @@ interface GamePageProps {
   lives: number;
   setLives: React.Dispatch<React.SetStateAction<number>>;
   user: { id: number; username: string } | null;
+  pendingBoard: any;
+  setPendingBoard: (b: any) => void;
+  
 }
 
 const GamePage: React.FC<GamePageProps> = ({ 
-  grid, setGrid, guesses, setGuesses, lives, setLives, user
+  grid, setGrid, guesses, setGuesses, lives, setLives, user, pendingBoard, setPendingBoard
 }) => {
   // Keep local "UI-only" state here (things that reset every time we visit the page)
   const [activeCell, setActiveCell] = useState<{ row: number, col: number } | null>(null);
@@ -26,6 +29,7 @@ const GamePage: React.FC<GamePageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [modalMessage, setModalMessage] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState(false);
   const navigate = useNavigate();
 
   const getPokemonSprite = (dexNumber: number) => 
@@ -99,23 +103,43 @@ const GamePage: React.FC<GamePageProps> = ({
     setModalMessage(null); 
   };
 
-  const handleGameComplete = async (finalGuesses: any[][]) => {
-    if (user) {
-        // Save to DB automatically if logged in
-        try {
-            await axios.post('http://localhost:5000/api/save-attempt', {
-                user_id: user.id,
-                puzzle_id: grid.puzzle_id, // Ensure your /api/new-game returns the puzzle_id!
-                guesses: finalGuesses,
-                score: 9,
-                did_complete: true
-            });
-            setModalMessage("COMPLETED_LOGGED_IN");
-        } catch (e) { console.error("Save failed", e); }
-    } else {
-        setModalMessage("COMPLETED_GUEST");
+  // 1. Helper function to keep things DRY (Don't Repeat Yourself)
+  const saveToDatabase = async (userId: number, puzzleId: number, finalGuesses: any[][]) => {
+    setPendingBoard(null);
+    try {
+      console.log(`Saving puzzle ${puzzleId} for user ${userId}...`);
+      await axios.post('http://localhost:5000/api/save-attempt', {
+        user_id: userId,
+        puzzle_id: puzzleId,
+        guesses: finalGuesses,
+        score: 9,
+        did_complete: true
+      });
+      setPendingSave(false);
+      setModalMessage("COMPLETED_LOGGED_IN");
+    } catch (e) {
+      console.error("Save failed:", e);
     }
   };
+
+  // 2. The main completion trigger
+const handleGameComplete = (finalGuesses: any[][]) => {
+    if (user) {
+      saveToDatabase(user.id, grid.puzzle_id, finalGuesses);
+    } else {
+      // Store the board in App.tsx memory
+      setPendingBoard({ puzzle_id: grid.puzzle_id, guesses: finalGuesses });
+      setModalMessage("COMPLETED_GUEST");
+    }
+  };
+
+  // 3. The "Late Login" Watcher
+  useEffect(() => {
+    // Only fire if we have a user AND a board waiting to be saved
+    if (user && pendingBoard) {
+      saveToDatabase(user.id, pendingBoard.puzzle_id, pendingBoard.guesses);
+    }
+  }, [user, pendingSave, grid, guesses]);
 
   if (!grid) return <div className="loading">Loading PokéDoku...</div>;
   
