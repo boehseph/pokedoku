@@ -8,17 +8,22 @@
 }
 
 .toast-content {
-  background: #333;
-  color: white;
+  background: var(--bg-surface);
+  color: var(--text-primary);
   padding: 12px 24px;
-  border-radius: 30px;
-  border: 2px solid #ff4d4d; /* Pokéball Red border */
-  font-weight: bold;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  border-radius: 999px;
+  border: 1px solid rgba(230, 57, 70, 0.45);
+  font-weight: 600;
   white-space: nowrap;
 }
 
 @keyframes slideDown {
-  from { transform: translate(-50%, -50px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+  from {
+    transform: translate(-50%, -50px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }

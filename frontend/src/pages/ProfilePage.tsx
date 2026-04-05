@@ -50,7 +50,7 @@ const ProfilePage: React.FC<ProfileProps> = ({ user, onLogout }) => {
       <section className="history-section">
         <h2>Completed Puzzles</h2>
         {history.length === 0 ? (
-          <p className="history-empty">No completed puzzles yet. Go catch &apos;em all!</p>
+          <p className="history-empty">No completed puzzles yet. Go to the home page to start a new game.</p>
         ) : (
           <ul className="attempts-list">
             {history.map((attempt) => (

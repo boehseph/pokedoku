@@ -51,9 +51,7 @@ const Grid: React.FC<GridProps> = ({
                     />
                     <span className="pokemon-name-label">{pokemon.name}</span>
                   </div>
-                ) : (
-                  <div className="empty-slot">+</div>
-                )}
+                ) : null}
               </div>
             );
           })}

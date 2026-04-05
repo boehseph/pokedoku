@@ -146,11 +146,19 @@ const GamePage: React.FC<GamePageProps> = ({
     setModalMessage(null);
   };
 
-  if (!grid) return <div className="loading">Loading PokéDoku...</div>;
+  if (!grid) {
+    return (
+      <div className="loading-screen" role="status" aria-live="polite">
+        <div className="loading-spinner" aria-hidden />
+        <p className="loading-text">Loading PokéDoku…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="game-container">
       <h1>PokéDoku</h1>
+      <p className="game-subtitle">COMP 3005 Final Project</p>
       <Grid
         grid={grid}
         guesses={guesses}
@@ -160,7 +168,7 @@ const GamePage: React.FC<GamePageProps> = ({
         getPokemonSprite={getPokemonSpriteUrl}
       />
       <div className="stats-container">
-        <div className="lives-counter">Guesses: {lives}/10</div>
+        <div className="lives-counter">PP: {lives}/10</div>
       </div>
       <SearchOverlay
         activeCell={activeCell}

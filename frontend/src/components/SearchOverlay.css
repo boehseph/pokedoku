@@ -1,22 +1,102 @@
 .search-overlay {
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.7);
-  display: flex; justify-content: center; align-items: center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   z-index: 100;
 }
 
 .search-modal {
-  background: white; padding: 20px; border-radius: 12px;
-  width: 300px; text-align: center; position: relative;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 28px 24px 20px;
+  border-radius: var(--radius-md);
+  width: min(340px, calc(100% - 32px));
+  text-align: center;
+  position: relative;
+  border: 1px solid var(--border-subtle);
 }
 
-.close-btn { position: absolute; top: 10px; right: 10px; cursor: pointer; }
+.search-modal h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-red-bright);
+}
 
-.results-list { margin-top: 15px; max-height: 200px; overflow-y: auto; }
+.search-modal .hint {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.search-modal input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.search-modal input:focus {
+  outline: none;
+  border-color: var(--accent-red);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.results-list {
+  margin-top: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  text-align: left;
+}
 
 .result-item {
-  padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  transition: background 0.12s ease;
 }
 
-.result-item:hover { background: #f0f0f0; }
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-item:hover {
+  background: var(--bg-elevated);
+  color: var(--accent-red-bright);
+}
